@@ -1,0 +1,4 @@
+*.json
+!manifest.webmanifest
+__pycache__/
+.DS_Store
