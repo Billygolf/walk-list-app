@@ -126,3 +126,10 @@ body.printing #app { max-width: none; padding: 0; }
   .sheets { overflow: visible; padding: 0; }
   .sh-page { margin: 0; box-shadow: none; break-after: page; }
 }
+.flash { background: var(--talk-bg); color: var(--talk); padding: 12px 16px; border-radius: 12px; margin: 16px 0 0; font-weight: 600; }
+.group { background: var(--surface); border-radius: 12px; overflow: hidden; margin-bottom: 8px; }
+.prow { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--rule); text-decoration: none; color: var(--ink); min-height: 56px; }
+.prow:last-child { border-bottom: 0; }
+.mini { width: 56px; height: 5px; background: var(--rule); border-radius: 3px; overflow: hidden; } .mini div { height: 100%; background: var(--accent); }
+.chev { color: var(--ink-2); font-size: 22px; }
+.navr { display: flex; gap: 18px; align-items: center; }
