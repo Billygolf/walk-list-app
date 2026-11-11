@@ -25,9 +25,9 @@ The camera and offline mode need HTTPS when it is not on localhost.
 
 ## Files
 
-- `js/layout.js` page geometry shared by printing and scanning (change both together)
-- `js/sheet.js` printable sheets
-- `js/scan.js` reads a photo of a sheet
-- `js/app.js` screens
-- `js/db.js` on-device storage
-- `vendor/` jsQR (Apache-2.0) and qrcode-generator (MIT)
+- `layout.js` page geometry shared by printing and scanning (change both together)
+- `sheet.js` printable sheets
+- `scan.js` reads a photo of a sheet
+- `app.js` screens
+- `db.js` on-device storage
+- `jsQR.js`, `qrcode.js`: jsQR (Apache-2.0) and qrcode-generator (MIT)

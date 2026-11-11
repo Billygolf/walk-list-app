@@ -15,7 +15,7 @@ const ICON = {
   phone: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></svg>',
 };
 
-let packs = {}, results = {}, scans = [], filter = '';
+let packs = {}, results = {}, scans = [], filter = '', flash = '';
 
 const chips = (res) => (res || []).map((r) => `<span class="chip ${CLS[r]}">${esc(r)}</span>`).join('');
 const resOf = (pack, turf, n) => results[db.resultKey(pack, turf, n)];
@@ -31,22 +31,57 @@ async function saveResult(pack, turf, n, res, note, src) {
 
 // ---------- views ----------
 
+const natural = (a, b) => a.localeCompare(b, undefined, { numeric: true });
+const packDoors = (p) => packs[p].turfs.reduce((n, t) => n + doorsOf(t).length, 0);
+const packDone = (p) => packs[p].turfs.reduce((n, t) => n + doneCount(p, t), 0);
+
+function turfCard(p, t) {
+  const n = doorsOf(t).length, d = doneCount(p, t);
+  return `<a class="card" href="#/t/${enc(p)}/${t.id}">
+    <div class="eyebrow"><span>${esc(p)} · Turf ${t.id.slice(1)}</span><span>${packs[p].mode === 'walking' ? 'Walking' : 'Driving'}</span></div>
+    <div class="card-title">${esc(tc(t.name))}</div>
+    <div class="bar"><div style="width:${n ? (100 * d) / n : 0}%"></div></div>
+    <div class="card-foot"><span>${d} of ${n} doors done</span></div></a>`;
+}
+
+function packRow(p) {
+  const n = packDoors(p), d = packDone(p);
+  return `<a class="prow" href="#/k/${enc(p)}"><div class="who"><span>${esc(p)}</span>
+    <small>${packs[p].turfs.length} turf${packs[p].turfs.length === 1 ? '' : 's'} · ${d ? `${d} of ${n} doors done` : `${n} doors`}</small></div>
+    ${d ? `<div class="mini"><div style="width:${(100 * d) / n}%"></div></div>` : ''}<span class="chev">›</span></a>`;
+}
+
 function home() {
-  const titles = Object.keys(packs).sort();
-  const f = filter.toLowerCase();
-  const cards = titles.flatMap((p) => packs[p].turfs.map((t) => ({ p, t }))).filter(({ p, t }) => !f || `${p} ${t.name}`.toLowerCase().includes(f))
-    .map(({ p, t }) => {
-      const n = doorsOf(t).length, d = doneCount(p, t);
-      return `<a class="card" href="#/t/${enc(p)}/${t.id}">
-        <div class="eyebrow"><span>${esc(p)} · Turf ${t.id.slice(1)}</span><span>${packs[p].mode === 'walking' ? 'Walking' : 'Driving'}</span></div>
-        <div class="card-title">${esc(tc(t.name))}</div>
-        <div class="bar"><div style="width:${n ? (100 * d) / n : 0}%"></div></div>
-        <div class="card-foot"><span>${d} of ${n} doors done</span></div></a>`;
-    }).join('');
-  return `<header class="top"><h1>My turfs</h1>
+  const titles = Object.keys(packs).sort(natural);
+  const f = filter.trim().toLowerCase();
+  let body;
+  if (!titles.length) body = `<div class="empty"><p>No walk lists loaded yet.</p><a class="btn" href="#/load">Load walk lists</a></div>`;
+  else if (f) {
+    const hitPacks = titles.filter((p) => p.toLowerCase().includes(f));
+    const hitTurfs = titles.flatMap((p) => packs[p].turfs.filter((t) => tc(t.name).toLowerCase().includes(f)
+      || t.rows.some((r) => (r.street || '').toLowerCase().includes(f))).map((t) => ({ p, t }))).slice(0, 40);
+    body = (hitPacks.length ? `<div class="group">${hitPacks.slice(0, 40).map(packRow).join('')}</div>` : '')
+      + (hitTurfs.length ? `<h3 class="street">Turfs on matching streets</h3><div class="stack">${hitTurfs.map(({ p, t }) => turfCard(p, t)).join('')}</div>` : '')
+      || '<p class="empty">Nothing matches.</p>';
+  } else {
+    const started = titles.filter((p) => packDone(p) > 0);
+    body = (started.length ? `<h3 class="street">In progress</h3><div class="group">${started.map(packRow).join('')}</div>` : '')
+      + `<h3 class="street">All precincts (${titles.length})</h3><div class="group">${titles.map(packRow).join('')}</div>`;
+  }
+  const note = flash ? `<p class="flash" role="status">${esc(flash)}</p>` : '';
+  flash = '';
+  return `${note}<header class="top"><h1>My turfs</h1>
     <div class="actions"><a class="btn" href="#/scan">${ICON.cam}Scan sheets</a><a class="btn tonal" href="#/load">Lists &amp; export</a></div>
-    ${titles.length ? `<label class="search"><span class="sr">Search turfs</span><input id="q" type="search" placeholder="Search precinct or street" value="${esc(filter)}"></label>` : ''}</header>
-    <main class="stack">${cards || (titles.length ? '<p class="empty">No turfs match.</p>' : `<div class="empty"><p>No walk lists loaded yet.</p><a class="btn" href="#/load">Load walk lists</a></div>`)}</main>`;
+    ${titles.length ? `<label class="search"><span class="sr">Search turfs</span><input id="q" type="search" placeholder="Search precinct (e.g. 420) or street" value="${esc(filter)}"></label>` : ''}</header>
+    <main>${body}</main>`;
+}
+
+function packView(p) {
+  if (!packs[p]) return notFound();
+  const n = packDoors(p), d = packDone(p);
+  return `<header class="top"><nav class="bar-nav"><a href="#/" class="back">${ICON.back}Turfs</a></nav>
+    <h1 class="h-sm">${esc(p)}</h1><div class="sub">${packs[p].turfs.length} turfs · ${d} of ${n} doors done</div></header>
+    <main class="stack">${packs[p].turfs.map((t) => turfCard(p, t)).join('')}</main>`;
 }
 
 function turfView(p, tid) {
@@ -63,7 +98,7 @@ function turfView(p, tid) {
     list += `<a class="door ${res?.res?.length ? 'done' : ''} ${next && r.n === next.n ? 'cur' : ''}" href="#/d/${enc(p)}/${tid}/${r.n}">
       <span class="num">${r.n}</span><div class="who"><span>${esc(tc(r.addr))}</span><small>${esc(r.name)} · ${esc(r.tier)}${res?.note ? ' · ' + esc(res.note) : ''}</small></div>${chips(res?.res)}</a>`;
   }
-  return `<header class="top"><nav class="bar-nav"><a href="#/" class="back">${ICON.back}Turfs</a><a href="#/p/${enc(p)}/${tid}" class="link">${ICON.print}Print</a></nav>
+  return `<header class="top"><nav class="bar-nav"><a href="#/k/${enc(p)}" class="back">${ICON.back}${esc(p.replace('Precinct ', ''))}</a><span class="navr"><button class="link" data-share="${tid}">Share</button><a href="#/p/${enc(p)}/${tid}" class="link">${ICON.print}Print</a></span></nav>
     <div class="eyebrow"><span>${esc(p)} · Turf ${tid.slice(1)}</span></div><h1 class="h-sm">${esc(tc(t.name))}</h1>
     <div class="sub">${d} of ${doors.length} doors done · ${t.maps.length} maps</div></header>
     ${leg ? `<a class="navbtn" href="${esc(leg.url)}" target="_blank" rel="noopener">${ICON.nav}<span><b>Navigate · Map ${next.map}</b><small>${esc(leg.label.replace(/^Map \d+ · /, ''))} · opens Google Maps</small></span></a>` : (doors.length ? '<p class="alldone">Every door on this turf has a result.</p>' : '')}
@@ -121,12 +156,14 @@ function loadView() {
   const titles = Object.keys(packs).sort();
   const nres = Object.values(results).filter((r) => r.res?.length).length;
   return `<header class="top"><nav class="bar-nav"><a href="#/" class="back">${ICON.back}Turfs</a></nav><h1 class="h-sm">Lists &amp; export</h1></header>
-    <section class="card"><div class="card-title">Load walk lists</div><p class="sub">Pick one or more list files (.json), for example “Precinct 303.02.json”.</p>
-    <label class="btn">Choose list files<input id="packs" type="file" accept=".json,application/json" multiple hidden></label></section>
+    <section class="card"><div class="card-title">Load walk lists</div><p class="sub">Pick one or more list files, for example “Precinct 303.02.json” or “All precincts.json.gz”.</p>
+    <label class="btn">Choose list files<input id="packs" type="file" multiple hidden></label></section>
     <section class="card"><div class="card-title">Export results</div><p class="sub">${nres} doors have results. Download them as a spreadsheet (CSV).</p>
     <button class="btn" id="export" ${nres ? '' : 'disabled'}>Download results</button></section>
+    <section class="card"><div class="card-title">Import results</div><p class="sub">Add results a volunteer sent you (their “Download results” spreadsheet). Newer results win.</p>
+    <label class="btn tonal">Choose results files<input id="resfiles" type="file" multiple hidden></label></section>
     <section class="card"><div class="card-title">Loaded lists</div>
-    ${titles.map((p) => `<div class="packrow"><span>${esc(p)} <small class="muted">${packs[p].turfs.length} turfs</small></span><button class="link danger" data-del="${esc(p)}">Remove</button></div>`).join('') || '<p class="muted">None yet.</p>'}</section>`;
+    ${titles.sort(natural).map((p) => `<div class="packrow"><span>${esc(p)} <small class="muted">${packs[p].turfs.length} turfs</small></span><button class="link danger" data-del="${esc(p)}">Remove</button></div>`).join('') || '<p class="muted">None yet.</p>'}</section>`;
 }
 
 const notFound = () => `<header class="top"><a href="#/" class="back">${ICON.back}Turfs</a><h1 class="h-sm">Not found</h1><p class="sub">That turf isn’t loaded on this phone.</p></header>`;
@@ -137,7 +174,7 @@ function render() {
   const parts = location.hash.replace(/^#\/?/, '').split('/').map(decodeURIComponent);
   const [v, a, b, c] = parts;
   document.body.classList.toggle('printing', v === 'p');
-  $('#app').innerHTML = v === 't' ? turfView(a, b) : v === 'd' ? doorView(a, b, c) : v === 'p' ? printView(a, b)
+  $('#app').innerHTML = v === 'k' ? packView(a) : v === 't' ? turfView(a, b) : v === 'd' ? doorView(a, b, c) : v === 'p' ? printView(a, b)
     : v === 'scan' ? scanView() : v === 'load' ? loadView() : home();
   if (v !== 'scan' && v !== 'p') window.scrollTo(0, 0);
   if (v === 't') document.querySelector('.door.cur')?.scrollIntoView({ block: 'center' });
@@ -172,6 +209,7 @@ document.addEventListener('click', async (e) => {
     s.saved = true;
     render();
   } else if (el.id === 'export') exportCsv();
+  else if (el.dataset.share) shareTurf(location.hash.replace(/^#\//, '').split('/').map(decodeURIComponent)[1], el.dataset.share);
   else if (el.dataset.del) {
     if (!confirm(`Remove ${el.dataset.del} from this phone? Its results stay saved.`)) return;
     delete packs[el.dataset.del];
@@ -195,12 +233,29 @@ document.addEventListener('change', async (e) => {
     const added = [];
     for (const f of inp.files) {
       try {
-        const d = JSON.parse(await f.text());
-        if (d.v !== 1 || !d.title || !Array.isArray(d.turfs)) throw new Error('not a walk list');
-        packs[d.title] = d; await db.put('packs', d.title, d); added.push(d.title);
-      } catch { alert(`${f.name} is not a walk list file.`); }
+        let d;
+        try { d = JSON.parse(await readText(f)); } catch { d = null; }
+        const list = d?.packs || [d];
+        const good = list.filter((x) => x && x.v === 1 && x.title && Array.isArray(x.turfs));
+        if (!good.length) { alert(`${f.name} is not a walk list file.`); continue; }
+        for (const x of good) { packs[x.title] = mergePack(packs[x.title], x); added.push(x.title); }
+        await db.putMany('packs', good.map((x) => [x.title, packs[x.title]]));
+      } catch (err) { alert(`Loaded ${f.name}, but this phone would not save it, so it will be gone after you close the app. (${err.message})`); }
     }
-    render();
+    inp.value = '';
+    if (added.length) {
+      flash = added.length > 3 ? `Loaded ${added.length} precincts` : `Loaded ${added.join(', ')}`;
+      filter = '';
+      location.hash = '#/';   // the hashchange handler shows My turfs with the message
+    } else render();
+  } else if (inp.id === 'resfiles') {
+    let n = 0;
+    for (const f of inp.files) {
+      try { n += await importCsv(await f.text()); } catch (err) { alert(`Could not read ${f.name}: ${err.message}`); }
+    }
+    inp.value = '';
+    flash = `Imported ${n} door result${n === 1 ? '' : 's'}`;
+    location.hash = '#/';
   } else if (inp.id === 'cam' || inp.id === 'files') {
     for (const f of inp.files) {
       const s = { name: f.name, busy: true };
@@ -213,6 +268,67 @@ document.addEventListener('change', async (e) => {
     inp.value = '';
   }
 });
+
+// A shared one-turf file must not wipe the other turfs of a precinct already on this phone.
+function mergePack(old, inc) {
+  if (!old) return inc;
+  const byId = new Map(old.turfs.map((t) => [t.id, t]));
+  for (const t of inc.turfs) byId.set(t.id, t);
+  const turfs = [...byId.values()].sort((a, b) => natural(a.id, b.id));
+  return { ...old, ...inc, turfs, turfCount: Math.max(old.turfCount || old.turfs.length, inc.turfCount || inc.turfs.length, turfs.length) };
+}
+
+// A file with just one turf, for a volunteer. Turf numbers stay the same so their sheets and results match yours.
+async function shareTurf(p, tid) {
+  const pack = packs[p], t = getTurf(p, tid);
+  const out = { v: 1, title: pack.title, mode: pack.mode, area: pack.area, turfCount: pack.turfCount || pack.turfs.length, turfs: [t] };
+  const name = `${p} Turf ${tid.slice(1)}.json`;
+  const file = new File([JSON.stringify(out)], name, { type: 'application/json' });
+  if (navigator.canShare?.({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: name, text: `Walk list: ${p} Turf ${tid.slice(1)}. Open https://billygolf.github.io/walk-list-app/ and load this file under Lists & export.` }); return; }
+    catch (err) { if (err.name === 'AbortError') return; }
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(file); a.download = name; a.click();
+}
+
+function parseCsv(text) {
+  const rows = []; let row = [], cell = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) { if (c === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else q = false; } else cell += c; }
+    else if (c === '"') q = true;
+    else if (c === ',') { row.push(cell); cell = ''; }
+    else if (c === '\n' || c === '\r') { if (c === '\r' && text[i + 1] === '\n') i++; row.push(cell); rows.push(row); row = []; cell = ''; }
+    else cell += c;
+  }
+  if (cell || row.length) { row.push(cell); rows.push(row); }
+  return rows.filter((r) => r.some((x) => x !== ''));
+}
+
+async function importCsv(text) {
+  const [head, ...rows] = parseCsv(text.replace(/^\uFEFF/, ''));
+  const col = (n) => head.indexOf(n);
+  if (col('List') < 0 || col('Turf') < 0 || col('Door') < 0) throw new Error('not a results spreadsheet from this app');
+  const put = [];
+  for (const r of rows) {
+    const key = db.resultKey(r[col('List')], 'T' + r[col('Turf')], +r[col('Door')]);
+    const v = { res: RESULTS.filter((x) => (r[col(x)] || '').trim().toUpperCase() === 'Y'), note: r[col('Note')] || '',
+      at: r[col('Recorded')] || new Date().toISOString(), src: 'import' };
+    const old = results[key];
+    if (old && old.at >= v.at) continue;
+    results[key] = v; put.push([key, v]);
+  }
+  if (put.length) await db.putMany('results', put);
+  return put.length;
+}
+
+// Reads a list file, unpacking it first if it is gzip-compressed (.json.gz).
+async function readText(f) {
+  const head = new Uint8Array(await f.slice(0, 2).arrayBuffer());
+  if (head[0] !== 0x1f || head[1] !== 0x8b) return f.text();
+  return new Response(f.stream().pipeThrough(new DecompressionStream('gzip'))).text();
+}
 
 function exportCsv() {
   const head = ['List', 'Turf', 'Door', 'Address', 'Voter', 'Tier', 'Phone', ...RESULTS, 'Note', 'Source', 'Recorded'];
