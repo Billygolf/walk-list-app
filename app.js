@@ -70,7 +70,7 @@ function home() {
   }
   const note = flash ? `<p class="flash" role="status">${esc(flash)}</p>` : '';
   flash = '';
-  return `${note}<header class="top"><h1>My turfs</h1>
+  return `${note}<div class="brand"><img src="logo.png" alt="Forests for Oregon"><span>Walk lists</span></div><header class="top"><h1>My turfs</h1>
     <div class="actions"><a class="btn" href="#/scan">${ICON.cam}Scan sheets</a><a class="btn tonal" href="#/load">Lists &amp; export</a></div>
     ${titles.length ? `<label class="search"><span class="sr">Search turfs</span><input id="q" type="search" placeholder="Search precinct (e.g. 420) or street" value="${esc(filter)}"></label>` : ''}</header>
     <main>${body}</main>`;
@@ -285,7 +285,7 @@ async function shareTurf(p, tid) {
   const name = `${p} Turf ${tid.slice(1)}.json`;
   const file = new File([JSON.stringify(out)], name, { type: 'application/json' });
   if (navigator.canShare?.({ files: [file] })) {
-    try { await navigator.share({ files: [file], title: name, text: `Walk list: ${p} Turf ${tid.slice(1)}. Open https://billygolf.github.io/walk-list-app/ and load this file under Lists & export.` }); return; }
+    try { await navigator.share({ files: [file], title: name, text: `Walk list: ${p} Turf ${tid.slice(1)}. Open ${location.origin}${location.pathname} and load this file under Lists & export.` }); return; }
     catch (err) { if (err.name === 'AbortError') return; }
   }
   const a = document.createElement('a');
