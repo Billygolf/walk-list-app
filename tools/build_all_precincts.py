@@ -128,9 +128,22 @@ def build(path):
                       **dist.get(p, {}), 'turfCount': len(turfs), 'turfs': turfs})
     return packs
 
-if __name__ == '__main__':
-    src, out = sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else 'All precincts.json.gz'
-    packs = build(src)
+def write(out, packs):
     with gzip.open(out, 'wb', compresslevel=9) as f: f.write(json.dumps({'packs': packs}, separators=(',', ':')).encode())
     print(out, len(packs), 'precincts', sum(len(x['turfs']) for x in packs), 'turfs',
           sum(len(t['rows']) for x in packs for t in x['turfs']), 'doors')
+
+if __name__ == '__main__':
+    # Add --districts FOLDER to also write one file per district ("HD 37.json.gz", "SD 19.json.gz", "CD 6.json.gz").
+    args = sys.argv[1:]
+    folder = None
+    if '--districts' in args:
+        i = args.index('--districts'); folder = args[i + 1]; del args[i:i + 2]
+    src, out = args[0], args[1] if len(args) > 1 else 'All precincts.json.gz'
+    packs = build(src)
+    write(out, packs)
+    if folder:
+        os.makedirs(folder, exist_ok=True)
+        for k in ('cd', 'sd', 'hd'):
+            for n in sorted({x[k] for x in packs if k in x}):
+                write(os.path.join(folder, f'{k.upper()} {n}.json.gz'), [x for x in packs if x.get(k) == n])

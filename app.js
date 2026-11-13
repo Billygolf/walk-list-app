@@ -23,6 +23,19 @@ const doorsOf = (turf) => turf.rows.filter((r) => r.knock);
 const doneCount = (pack, turf) => doorsOf(turf).filter((r) => resOf(pack, turf.id, r.n)?.res?.length).length;
 const getTurf = (p, t) => packs[p]?.turfs.find((x) => x.id === t);
 // "CD 1 · HD 27 · SD 14" for a precinct, or '' if its list file predates districts.
+const DIST_RE = /^\s*(cd|hd|sd)\s*(\d+)\s*$/i;
+const DIST_NAME = { cd: 'Congressional District', sd: 'Oregon Senate District', hd: 'Oregon House District' };
+// A menu of every district among the loaded precincts; picking one fills the search box ("HD 37").
+function districtMenu(titles) {
+  const sets = { cd: new Set(), sd: new Set(), hd: new Set() };
+  for (const p of titles) for (const k in sets) if (packs[p][k]) sets[k].add(packs[p][k]);
+  if (!sets.cd.size) return '';
+  const cur = (DIST_RE.exec(filter) || []).slice(1, 3).join(' ').toLowerCase();
+  const group = (k, label) => `<optgroup label="${label}">${[...sets[k]].sort((a, b) => a - b).map((n) => {
+    const v = `${k} ${n}`; return `<option value="${v}" ${v === cur ? 'selected' : ''}>${k.toUpperCase()} ${n}</option>`; }).join('')}</optgroup>`;
+  return `<label class="distpick"><span class="sr">Filter by district</span><select id="dist"><option value="">All districts</option>
+    ${group('cd', 'Congress')}${group('sd', 'Oregon Senate')}${group('hd', 'Oregon House')}</select></label>`;
+}
 const districts = (pk) => (pk?.cd ? `CD ${pk.cd} · HD ${pk.hd} · SD ${pk.sd}` : '');
 
 async function saveResult(pack, turf, n, res, note, src) {
@@ -58,7 +71,13 @@ function home() {
   const f = filter.trim().toLowerCase();
   let body;
   if (!titles.length) body = `<div class="empty"><p>No walk lists loaded yet.</p><a class="btn" href="#/load">Load walk lists</a></div>`;
-  else if (f) {
+  else if (DIST_RE.test(f)) {
+    const [, k, num] = DIST_RE.exec(f);
+    const hits = titles.filter((p) => packs[p][k] === +num);
+    const n = hits.reduce((s, p) => s + packDoors(p), 0), d = hits.reduce((s, p) => s + packDone(p), 0);
+    body = hits.length ? `<h3 class="street">${DIST_NAME[k]} ${num} · ${hits.length} precinct${hits.length === 1 ? '' : 's'} · ${d ? `${d} of ${n}` : n} doors</h3><div class="group">${hits.map(packRow).join('')}</div>`
+      : `<p class="empty">No loaded precincts are in ${k.toUpperCase()} ${num}.${titles.some((p) => packs[p].cd) ? '' : ' Load the newest list file to get districts.'}</p>`;
+  } else if (f) {
     const hitPacks = titles.filter((p) => p.toLowerCase().includes(f));
     const hitTurfs = titles.flatMap((p) => packs[p].turfs.filter((t) => tc(t.name).toLowerCase().includes(f)
       || t.rows.some((r) => (r.street || '').toLowerCase().includes(f))).map((t) => ({ p, t }))).slice(0, 40);
@@ -74,7 +93,7 @@ function home() {
   flash = '';
   return `${note}<div class="brand"><img src="logo.png" alt="Forests for Oregon"><span>Walk lists</span></div><header class="top"><h1>My turfs</h1>
     <div class="actions"><a class="btn" href="#/scan">${ICON.cam}Scan sheets</a><a class="btn tonal" href="#/load">Lists &amp; export</a></div>
-    ${titles.length ? `<label class="search"><span class="sr">Search turfs</span><input id="q" type="search" placeholder="Search precinct (e.g. 420) or street" value="${esc(filter)}"></label>` : ''}</header>
+    ${titles.length ? `<label class="search"><span class="sr">Search turfs</span><input id="q" type="search" placeholder="Precinct (420), street, or district (HD 37)" value="${esc(filter)}"></label>${districtMenu(titles)}` : ''}</header>
     <main>${body}</main>`;
 }
 
@@ -232,6 +251,7 @@ document.addEventListener('input', (e) => {
 
 document.addEventListener('change', async (e) => {
   const inp = e.target;
+  if (inp.id === 'dist') { filter = inp.value ? inp.value.toUpperCase() : ''; render(); return; }
   if (inp.id === 'packs') {
     const added = [];
     for (const f of inp.files) {

@@ -24,7 +24,7 @@ To rebuild the whole county in one file (`All precincts.json.gz`) straight from 
 python3 tools/build_all_precincts.py 34_Ex-VotingHistory-<date>.txt "All precincts.json.gz"
 ```
 
-The targeting rules are described at the top of that script. Load the result under **Lists & export**.
+Add `--districts "District lists"` to also write one file per Congressional, Oregon Senate and Oregon House district. The targeting rules are described at the top of that script. Load the result under **Lists & export**.
 
 ## Running it locally
 
