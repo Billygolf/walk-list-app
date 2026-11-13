@@ -1,17 +1,17 @@
 :root {
-  --ground: #f2f4f4; --surface: #fff; --ink: #141b1b; --ink-2: #48534f; --rule: #e1e5e4;
-  --accent: #0d5b56; --accent-ink: #fff; --tonal: #d6e9e6; --tonal-ink: #0a4440;
-  --talk-bg: #d8ece9; --talk: #0a4a46; --nh-bg: #e4e7e9; --nh: #3c464d;
+  --ground: #f3f4ee; --surface: #fff; --ink: #142019; --ink-2: #4a564e; --rule: #e0e4dc;
+  --accent: #1e4a30; --accent-ink: #fff; --tonal: #dbe8dc; --tonal-ink: #173a25;
+  --talk-bg: #d9ead9; --talk: #1d4a2e; --nh-bg: #e4e7e9; --nh: #3c464d;
   --lit-bg: #dde7f5; --lit: #1f4a85; --vote-bg: #f6e6cf; --vote: #6b3f08;
-  --warn-bg: #fff2e0; --warn: #8a4f00; --cur: #e9f4f2;
+  --warn-bg: #fff2e0; --warn: #8a4f00; --cur: #ecf3e6;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --ground: #101616; --surface: #1a2222; --ink: #e8eeed; --ink-2: #a8b4b1; --rule: #2a3434;
-    --accent: #3fb3a8; --accent-ink: #04201d; --tonal: #1f3a37; --tonal-ink: #bfe6e0;
-    --talk-bg: #1d3a36; --talk: #9fe0d6; --nh-bg: #2a3236; --nh: #c4ccd1;
+    --ground: #0f1512; --surface: #18211b; --ink: #e9eee8; --ink-2: #a9b5ac; --rule: #29352d;
+    --accent: #8fc3a0; --accent-ink: #0b2014; --tonal: #1f3527; --tonal-ink: #cfe5d4;
+    --talk-bg: #1e3626; --talk: #a9dcb6; --nh-bg: #2a3236; --nh: #c4ccd1;
     --lit-bg: #1f2e44; --lit: #a9c6f0; --vote-bg: #3d2d16; --vote: #f1cd96;
-    --warn-bg: #3a2a12; --warn: #f3bf72; --cur: #1b2e2c; color-scheme: dark;
+    --warn-bg: #3a2a12; --warn: #f3bf72; --cur: #1a2a1f; color-scheme: dark;
   }
 }
 * { box-sizing: border-box; }
@@ -21,6 +21,9 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 a { color: var(--accent); }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 .top { padding: 16px 0 12px; }
+.brand { display: flex; align-items: center; gap: 12px; padding-top: 16px; }
+.brand img { height: 64px; width: auto; }
+.brand span { font-size: 15px; font-weight: 600; color: var(--ink-2); }
 h1 { font-size: 32px; margin: 4px 0 12px; letter-spacing: -.4px; }
 h1.h-sm { font-size: 24px; margin: 2px 0 4px; }
 .sub { color: var(--ink-2); font-size: 15px; } .sub.big { font-size: 17px; color: var(--ink); }
