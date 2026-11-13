@@ -39,7 +39,7 @@ export function sheetHtml(pack, turf) {
         <span class="sh-nm">${esc(r.name)}</span><span class="sh-ti">${esc(r.tier)}</span>${boxes}<span class="sh-note"></span></div>`;
     }).join('');
     return `<div class="sh-page">${fids}
-      <div class="sh-hd"><div class="sh-eb">${esc(pack.title)} · Turf ${turf.id.slice(1)} of ${pack.turfCount || pack.turfs.length} · Page ${p} of ${pages.length}</div>
+      <div class="sh-hd"><div class="sh-eb">${esc(pack.title)}${pack.cd ? ` · CD ${pack.cd} · HD ${pack.hd} · SD ${pack.sd}` : ''} · Turf ${turf.id.slice(1)} of ${pack.turfCount || pack.turfs.length} · Page ${p} of ${pages.length}</div>
       <div class="sh-h2">${esc(nice(turf.name))}</div><div class="sh-sign">Canvasser ____________________ &nbsp; Date __________</div></div>
       <div class="sh-pq">${qrSvg(code)}</div><div class="sh-pid">${esc(code.slice(4))}</div>
       <div class="sh-maps">${qrs}</div>

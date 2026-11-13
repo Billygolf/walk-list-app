@@ -22,6 +22,21 @@ const resOf = (pack, turf, n) => results[db.resultKey(pack, turf, n)];
 const doorsOf = (turf) => turf.rows.filter((r) => r.knock);
 const doneCount = (pack, turf) => doorsOf(turf).filter((r) => resOf(pack, turf.id, r.n)?.res?.length).length;
 const getTurf = (p, t) => packs[p]?.turfs.find((x) => x.id === t);
+// "CD 1 · HD 27 · SD 14" for a precinct, or '' if its list file predates districts.
+const DIST_RE = /^\s*(cd|hd|sd)\s*(\d+)\s*$/i;
+const DIST_NAME = { cd: 'Congressional District', sd: 'Oregon Senate District', hd: 'Oregon House District' };
+// A menu of every district among the loaded precincts; picking one fills the search box ("HD 37").
+function districtMenu(titles) {
+  const sets = { cd: new Set(), sd: new Set(), hd: new Set() };
+  for (const p of titles) for (const k in sets) if (packs[p][k]) sets[k].add(packs[p][k]);
+  if (!sets.cd.size) return '';
+  const cur = (DIST_RE.exec(filter) || []).slice(1, 3).join(' ').toLowerCase();
+  const group = (k, label) => `<optgroup label="${label}">${[...sets[k]].sort((a, b) => a - b).map((n) => {
+    const v = `${k} ${n}`; return `<option value="${v}" ${v === cur ? 'selected' : ''}>${k.toUpperCase()} ${n}</option>`; }).join('')}</optgroup>`;
+  return `<label class="distpick"><span class="sr">Filter by district</span><select id="dist"><option value="">All districts</option>
+    ${group('cd', 'Congress')}${group('sd', 'Oregon Senate')}${group('hd', 'Oregon House')}</select></label>`;
+}
+const districts = (pk) => (pk?.cd ? `CD ${pk.cd} · HD ${pk.hd} · SD ${pk.sd}` : '');
 
 async function saveResult(pack, turf, n, res, note, src) {
   const v = { res, note: note || '', at: new Date().toISOString(), src };
@@ -56,7 +71,13 @@ function home() {
   const f = filter.trim().toLowerCase();
   let body;
   if (!titles.length) body = `<div class="empty"><p>No walk lists loaded yet.</p><a class="btn" href="#/load">Load walk lists</a></div>`;
-  else if (f) {
+  else if (DIST_RE.test(f)) {
+    const [, k, num] = DIST_RE.exec(f);
+    const hits = titles.filter((p) => packs[p][k] === +num);
+    const n = hits.reduce((s, p) => s + packDoors(p), 0), d = hits.reduce((s, p) => s + packDone(p), 0);
+    body = hits.length ? `<h3 class="street">${DIST_NAME[k]} ${num} · ${hits.length} precinct${hits.length === 1 ? '' : 's'} · ${d ? `${d} of ${n}` : n} doors</h3><div class="group">${hits.map(packRow).join('')}</div>`
+      : `<p class="empty">No loaded precincts are in ${k.toUpperCase()} ${num}.${titles.some((p) => packs[p].cd) ? '' : ' Load the newest list file to get districts.'}</p>`;
+  } else if (f) {
     const hitPacks = titles.filter((p) => p.toLowerCase().includes(f));
     const hitTurfs = titles.flatMap((p) => packs[p].turfs.filter((t) => tc(t.name).toLowerCase().includes(f)
       || t.rows.some((r) => (r.street || '').toLowerCase().includes(f))).map((t) => ({ p, t }))).slice(0, 40);
@@ -72,7 +93,7 @@ function home() {
   flash = '';
   return `${note}<div class="brand"><img src="logo.png" alt="Forests for Oregon"><span>Walk lists</span></div><header class="top"><h1>My turfs</h1>
     <div class="actions"><a class="btn" href="#/scan">${ICON.cam}Scan sheets</a><a class="btn tonal" href="#/load">Lists &amp; export</a></div>
-    ${titles.length ? `<label class="search"><span class="sr">Search turfs</span><input id="q" type="search" placeholder="Search precinct (e.g. 420) or street" value="${esc(filter)}"></label>` : ''}</header>
+    ${titles.length ? `<label class="search"><span class="sr">Search turfs</span><input id="q" type="search" placeholder="Precinct (420), street, or district (HD 37)" value="${esc(filter)}"></label>${districtMenu(titles)}` : ''}</header>
     <main>${body}</main>`;
 }
 
@@ -80,7 +101,7 @@ function packView(p) {
   if (!packs[p]) return notFound();
   const n = packDoors(p), d = packDone(p);
   return `<header class="top"><nav class="bar-nav"><a href="#/" class="back">${ICON.back}Turfs</a></nav>
-    <h1 class="h-sm">${esc(p)}</h1><div class="sub">${packs[p].turfs.length} turfs · ${d} of ${n} doors done</div></header>
+    <h1 class="h-sm">${esc(p)}</h1>${districts(packs[p]) ? `<div class="dist">${districts(packs[p])}</div>` : ''}<div class="sub">${packs[p].turfs.length} turfs · ${d} of ${n} doors done</div></header>
     <main class="stack">${packs[p].turfs.map((t) => turfCard(p, t)).join('')}</main>`;
 }
 
@@ -99,7 +120,7 @@ function turfView(p, tid) {
       <span class="num">${r.n}</span><div class="who"><span>${esc(tc(r.addr))}</span><small>${esc(r.name)} · ${esc(r.tier)}${res?.note ? ' · ' + esc(res.note) : ''}</small></div>${chips(res?.res)}</a>`;
   }
   return `<header class="top"><nav class="bar-nav"><a href="#/k/${enc(p)}" class="back">${ICON.back}${esc(p.replace('Precinct ', ''))}</a><span class="navr"><button class="link" data-share="${tid}">Share</button><a href="#/p/${enc(p)}/${tid}" class="link">${ICON.print}Print</a></span></nav>
-    <div class="eyebrow"><span>${esc(p)} · Turf ${tid.slice(1)}</span></div><h1 class="h-sm">${esc(tc(t.name))}</h1>
+    <div class="eyebrow"><span>${esc(p)} · Turf ${tid.slice(1)}</span><span>${districts(packs[p])}</span></div><h1 class="h-sm">${esc(tc(t.name))}</h1>
     <div class="sub">${d} of ${doors.length} doors done · ${t.maps.length} maps</div></header>
     ${leg ? `<a class="navbtn" href="${esc(leg.url)}" target="_blank" rel="noopener">${ICON.nav}<span><b>Navigate · Map ${next.map}</b><small>${esc(leg.label.replace(/^Map \d+ · /, ''))} · opens Google Maps</small></span></a>` : (doors.length ? '<p class="alldone">Every door on this turf has a result.</p>' : '')}
     <main class="list">${list}</main>`;
@@ -115,7 +136,8 @@ function doorView(p, tid, n) {
   const q = enc(`${r.addr}, ${packs[p].area || 'Washington County, OR'}`);
   return `<header class="top"><nav class="bar-nav"><a href="#/t/${enc(p)}/${tid}" class="back">${ICON.back}Turf ${tid.slice(1)}</a><span class="muted">Door ${r.n} of ${doors.length}</span></nav>
     <h1 class="h-sm">${esc(tc(r.addr))}</h1><div class="sub big">${esc(r.name)} <span class="chip r-tier">${esc(r.tier)}</span></div>
-    <div class="sub">Household of ${esc(r.hh)}${leg ? ' · ' + esc(leg.label) : ''}</div></header>
+    <div class="sub">Household of ${esc(r.hh)}${leg ? ' · ' + esc(leg.label) : ''}</div>
+    ${districts(packs[p]) ? `<div class="dist">${districts(packs[p])}</div>` : ''}</header>
     <div class="row2"><a class="btn ghost" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=${q}">${ICON.nav}Directions</a>
     ${r.phone ? `<a class="btn ghost" href="tel:${esc(r.phone.replace(/[^\d+]/g, ''))}">${ICON.phone}Call</a>` : '<span class="btn ghost off">No phone</span>'}</div>
     <h2 class="label">What happened? Tap all that apply</h2>
@@ -229,6 +251,7 @@ document.addEventListener('input', (e) => {
 
 document.addEventListener('change', async (e) => {
   const inp = e.target;
+  if (inp.id === 'dist') { filter = inp.value ? inp.value.toUpperCase() : ''; render(); return; }
   if (inp.id === 'packs') {
     const added = [];
     for (const f of inp.files) {
@@ -281,7 +304,7 @@ function mergePack(old, inc) {
 // A file with just one turf, for a volunteer. Turf numbers stay the same so their sheets and results match yours.
 async function shareTurf(p, tid) {
   const pack = packs[p], t = getTurf(p, tid);
-  const out = { v: 1, title: pack.title, mode: pack.mode, area: pack.area, turfCount: pack.turfCount || pack.turfs.length, turfs: [t] };
+  const out = { v: 1, title: pack.title, mode: pack.mode, area: pack.area, cd: pack.cd, hd: pack.hd, sd: pack.sd, turfCount: pack.turfCount || pack.turfs.length, turfs: [t] };
   const name = `${p} Turf ${tid.slice(1)}.json`;
   const file = new File([JSON.stringify(out)], name, { type: 'application/json' });
   if (navigator.canShare?.({ files: [file] })) {
@@ -331,13 +354,14 @@ async function readText(f) {
 }
 
 function exportCsv() {
-  const head = ['List', 'Turf', 'Door', 'Address', 'Voter', 'Tier', 'Phone', ...RESULTS, 'Note', 'Source', 'Recorded'];
+  const head = ['List', 'Turf', 'Door', 'Address', 'Voter', 'Tier', 'Phone', 'CD', 'HD', 'SD', ...RESULTS, 'Note', 'Source', 'Recorded'];
   const lines = [head];
   for (const [k, v] of Object.entries(results)) {
     if (!v.res?.length && !v.note) continue;
     const [p, t, n] = k.split('|');
     const r = getTurf(p, t)?.rows.find((x) => x.knock && x.n === +n) || {};
-    lines.push([p, t.slice(1), n, r.addr, r.name, r.tier, r.phone, ...RESULTS.map((x) => (v.res.includes(x) ? 'Y' : '')), v.note, v.src, v.at]);
+    const pk = packs[p] || {};
+    lines.push([p, t.slice(1), n, r.addr, r.name, r.tier, r.phone, pk.cd, pk.hd, pk.sd, ...RESULTS.map((x) => (v.res.includes(x) ? 'Y' : '')), v.note, v.src, v.at]);
   }
   const csv = lines.map((l) => l.map((c) => `"${String(c ?? '').replace(/"/g, '""')}"`).join(',')).join('\r\n');
   const a = document.createElement('a');
