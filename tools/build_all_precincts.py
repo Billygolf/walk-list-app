@@ -2,6 +2,10 @@
 
     python3 tools/build_all_precincts.py 34_Ex-VotingHistory-....txt "All precincts.json.gz"
 
+Districts (Congress, Oregon House, Oregon Senate) come from tools/precinct_districts.csv, taken from
+the county's certified May 19, 2026 primary results (each precinct is listed under the US
+Representative and State Representative contests it votes in). Senate district = (House + 1) // 2.
+
 Targeting follows the precinct walk-list pages (sql/15_tiers.sql), checked against them:
 - VoteRank (VR) = round(10 * YES / (YES + NO)); '-' means not eligible and is left out.
   A voter is "vested" (counted in the household average) with 4 or more opportunities.
@@ -14,7 +18,7 @@ Targeting follows the precinct walk-list pages (sql/15_tiers.sql), checked again
   broken at a street change, never more than 42 (same as the precinct pages).
 - Rural precincts are marked "driving"; the original routed them by road, this orders them by street.
 """
-import sys, re, json, gzip, math, urllib.parse
+import sys, re, json, gzip, math, csv, os, urllib.parse
 from collections import defaultdict, Counter
 
 LEAN = {'REP': 8, 'LBT': 7, 'IND': 6, 'NLB': 6, 'NAV': 5, 'OTH': 5, 'DEM': 2, 'PGP': 1, 'WFP': 1, 'PRO': 1}
@@ -81,7 +85,12 @@ def order(k):
     u = (k[2] or '').split(' ', 1)[-1] if k[2] else ''
     return (re.sub(r'^(N|S|E|W|NE|NW|SE|SW) ', '', k[1]), k[1], natkey(k[0]), (len(u), u), k[2] or '')
 
+def districts():
+    f = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'precinct_districts.csv')
+    return {r['precinct']: {k: int(r[k]) for k in ('cd', 'hd', 'sd')} for r in csv.DictReader(open(f))}
+
 def build(path):
+    dist = districts()
     groups, pname = defaultdict(lambda: defaultdict(list)), {}
     for d in load(path):
         if d['PRECINCT'] == '0000': continue
@@ -116,7 +125,7 @@ def build(path):
                           'rows': [{k: r[k] for k in ['n', 'knock', 'addr', 'name', 'hh', 'tier', 'phone', 'street', 'map']} for r in rows]})
         (city, zp), _ = cities.most_common(1)[0]
         packs.append({'v': 1, 'title': f'Precinct {p}', 'mode': mode, 'area': f'{city.title()}, OR {zp}',
-                      'turfCount': len(turfs), 'turfs': turfs})
+                      **dist.get(p, {}), 'turfCount': len(turfs), 'turfs': turfs})
     return packs
 
 if __name__ == '__main__':

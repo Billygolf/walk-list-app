@@ -1,5 +1,5 @@
 // Keeps the app working without signal: serve saved copies first, refresh them in the background.
-const CACHE = 'walk-lists-v5';
+const CACHE = 'walk-lists-v6';
 const FILES = ['./', 'index.html', 'styles.css', 'manifest.webmanifest', 'logo.png', 'favicon.png', 'apple-touch-icon.png', 'icon-192.png',
   'app.js', 'db.js', 'layout.js', 'scan.js', 'sheet.js', 'jsQR.js', 'qrcode.js'];
 self.addEventListener('install', (e) => e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES)).then(() => self.skipWaiting())));

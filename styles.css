@@ -26,7 +26,8 @@ a { color: var(--accent); }
 .brand span { font-size: 15px; font-weight: 600; color: var(--ink-2); }
 h1 { font-size: 32px; margin: 4px 0 12px; letter-spacing: -.4px; }
 h1.h-sm { font-size: 24px; margin: 2px 0 4px; }
-.sub { color: var(--ink-2); font-size: 15px; } .sub.big { font-size: 17px; color: var(--ink); }
+.sub { color: var(--ink-2); font-size: 15px; }
+.dist { display: inline-block; margin: 6px 0 4px; padding: 3px 8px; border-radius: 6px; background: var(--tonal); color: var(--tonal-ink); font-size: 13px; font-weight: 600; letter-spacing: .02em; } .sub.big { font-size: 17px; color: var(--ink); }
 .muted { color: var(--ink-2); font-size: 14px; } .center { text-align: center; }
 .eyebrow { display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; color: var(--ink-2); text-transform: uppercase; letter-spacing: .04em; }
 .bar-nav { display: flex; justify-content: space-between; align-items: center; min-height: 44px; margin-bottom: 4px; }
