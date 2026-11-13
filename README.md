@@ -18,6 +18,14 @@ made from the route sheets with:
 python3 tools/route_to_json.py "Precinct 303.02 Route.html" [more files...] out-folder/
 ```
 
+To rebuild the whole county in one file (`All precincts.json.gz`) straight from the voter export:
+
+```
+python3 tools/build_all_precincts.py 34_Ex-VotingHistory-<date>.txt "All precincts.json.gz"
+```
+
+The targeting rules are described at the top of that script. Load the result under **Lists & export**.
+
 ## Running it locally
 
 Any static web server works, for example `python3 -m http.server` in this folder, then open http://localhost:8000.
