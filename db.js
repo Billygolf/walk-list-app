@@ -1,13 +1,15 @@
 // Everything is stored on this device in IndexedDB. Nothing is sent anywhere.
-const DB = 'walk-lists', VER = 1;
+const DB = 'walk-lists', VER = 2;
 let dbp;
 
 function open() {
   dbp ??= new Promise((res, rej) => {
     const r = indexedDB.open(DB, VER);
     r.onupgradeneeded = () => {
-      r.result.createObjectStore('packs');     // key: pack title
-      r.result.createObjectStore('results');   // key: "title|T1|7"
+      const have = r.result.objectStoreNames;
+      if (!have.contains('packs')) r.result.createObjectStore('packs');       // key: pack title
+      if (!have.contains('results')) r.result.createObjectStore('results');   // key: "title|T1|7"
+      if (!have.contains('cands')) r.result.createObjectStore('cands');       // key: "hd 27"; { name, role, photo, at }
     };
     r.onsuccess = () => res(r.result);
     r.onerror = () => rej(r.error);

@@ -5,6 +5,7 @@ A phone app for door-to-door canvassing that works with paper too.
 - **Walk a turf** on your phone: doors in route order, one tap to open the next Google Maps leg, record each door (Talked, Not home, Left lit, Voted, plus a note).
 - **Print scan sheets** for any turf. Each page has black corner squares and a page code.
 - **Scan filled-in sheets** with the phone camera. The app straightens the photo, reads the page code and the checked boxes, and shows a review screen before saving.
+- **Candidates**: add the name and photo of the candidate we support in each Congressional, Oregon House and Oregon Senate district (Lists & export, then Edit candidates, or tap a district on a precinct). They show on precincts, turfs, doors, the district filter and printed sheets. Photos are stored on the phone only, never in this repository. Share sends them to volunteers, and shared turfs carry them too.
 - **Export** all results as a CSV spreadsheet.
 
 Everything is stored on the phone (IndexedDB). Nothing is sent to a server. It keeps working without signal once it has been opened once.
