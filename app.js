@@ -32,9 +32,18 @@ function districtMenu(titles) {
   if (!sets.cd.size) return '';
   const cur = (DIST_RE.exec(filter) || []).slice(1, 3).join(' ').toLowerCase();
   const group = (k, label) => `<optgroup label="${label}">${[...sets[k]].sort((a, b) => a - b).map((n) => {
-    const v = `${k} ${n}`; return `<option value="${v}" ${v === cur ? 'selected' : ''}>${k.toUpperCase()} ${n}</option>`; }).join('')}</optgroup>`;
+    const v = `${k} ${n}`, c = cands[v];
+    return `<option value="${v}" ${v === cur ? 'selected' : ''}>${k.toUpperCase()} ${n}${c ? ` · ${esc(c.name)}` : ''}</option>`; }).join('')}</optgroup>`;
+  // The picked district's candidate sits right under the menu, with a button to add or change the name and photo.
+  let who = '';
+  if (cur) {
+    const [k, n] = cur.split(' '), c = cands[cur];
+    who = `<a class="cand solo ${c ? '' : 'empty'}" href="#/c/${k}/${n}">${face(c)}<span class="cwho"><small>${k.toUpperCase()} ${n} · our candidate</small>
+      <b>${c ? esc(c.name) : 'No candidate yet'}</b>${c?.incumbent ? '<small>Incumbent</small>' : ''}</span><span class="pill">${c ? 'Edit' : 'Add name &amp; photo'}</span></a>`;
+  }
   return `<label class="distpick"><span class="sr">Filter by district</span><select id="dist"><option value="">All districts</option>
-    ${group('cd', 'Congress')}${group('sd', 'Oregon Senate')}${group('hd', 'Oregon House')}</select></label>`;
+    ${group('cd', 'Congress')}${group('sd', 'Oregon Senate')}${group('hd', 'Oregon House')}
+    <optgroup label="Candidates"><option value="edit">Add or change candidate names and photos…</option></optgroup></select></label>${who}`;
 }
 const districts = (pk) => (pk?.cd ? `CD ${pk.cd} · HD ${pk.hd} · SD ${pk.sd}` : '');
 
@@ -119,9 +128,7 @@ function home() {
     const [, k, num] = DIST_RE.exec(f);
     const hits = titles.filter((p) => packs[p][k] === +num);
     const n = hits.reduce((s, p) => s + packDoors(p), 0), d = hits.reduce((s, p) => s + packDone(p), 0);
-    const c = cands[candKey(k, +num)];
-    const who = `<a class="cand solo ${c ? '' : 'empty'}" href="#/c/${k}/${+num}">${face(c)}<span class="cwho"><small>${k.toUpperCase()} ${+num} · our candidate</small><b>${c ? esc(c.name) : 'Add candidate'}</b>${c?.incumbent ? '<small>Incumbent</small>' : ''}</span></a>`;
-    body = hits.length ? `${who}<h3 class="street">${DIST_NAME[k]} ${num} · ${hits.length} precinct${hits.length === 1 ? '' : 's'} · ${d ? `${d} of ${n}` : n} doors</h3><div class="group">${hits.map(packRow).join('')}</div>`
+    body = hits.length ? `<h3 class="street">${DIST_NAME[k]} ${num} · ${hits.length} precinct${hits.length === 1 ? '' : 's'} · ${d ? `${d} of ${n}` : n} doors</h3><div class="group">${hits.map(packRow).join('')}</div>`
       : `<p class="empty">No loaded precincts are in ${k.toUpperCase()} ${num}.${titles.some((p) => packs[p].cd) ? '' : ' Load the newest list file to get districts.'}</p>`;
   } else if (f) {
     const hitPacks = titles.filter((p) => p.toLowerCase().includes(f));
@@ -138,7 +145,7 @@ function home() {
   const note = flash ? `<p class="flash" role="status">${esc(flash)}</p>` : '';
   flash = '';
   return `${note}<div class="brand"><img src="logo.png" alt="Forests for Oregon"><span>Walk lists</span></div><header class="top"><h1>My turfs</h1>
-    <div class="actions"><a class="btn" href="#/scan">${ICON.cam}Scan sheets</a><a class="btn tonal" href="#/load">Lists &amp; export</a></div>
+    <div class="actions"><a class="btn" href="#/scan">${ICON.cam}Scan sheets</a><a class="btn tonal" href="#/load">Lists &amp; export</a><a class="btn tonal hqbtn" href="#/hq">HQ</a></div>
     ${titles.length ? `<label class="search"><span class="sr">Search turfs</span><input id="q" type="search" placeholder="Precinct (420), street, or district (HD 37)" value="${esc(filter)}"></label>${districtMenu(titles)}` : ''}</header>
     <main>${body}</main>`;
 }
@@ -226,6 +233,8 @@ function loadView() {
   return `<header class="top"><nav class="bar-nav"><a href="#/" class="back">${ICON.back}Turfs</a></nav><h1 class="h-sm">Lists &amp; export</h1></header>
     <section class="card"><div class="card-title">Load walk lists</div><p class="sub">Pick one or more list files, for example “Precinct 303.02.json” or “All precincts.json.gz”.</p>
     <label class="btn">Choose list files<input id="packs" type="file" multiple hidden></label></section>
+    <section class="card"><div class="card-title">HQ</div><p class="sub">Running things from a computer? See progress by district and precinct, send precincts to volunteers, and load their results.</p>
+    <a class="btn tonal" href="#/hq">Open HQ</a></section>
     <section class="card"><div class="card-title">Candidates</div><p class="sub">${Object.keys(cands).length ? `${Object.keys(cands).length} of ${allDistricts().length} districts have a candidate.` : 'Add the name and photo of the candidate we support in each district.'} They show on precincts, turfs, doors and printed sheets.</p>
     <a class="btn tonal" href="#/c">Edit candidates</a></section>
     <section class="card"><div class="card-title">Export results</div><p class="sub">${nres} doors have results. Download them as a spreadsheet (CSV).</p>
@@ -275,6 +284,63 @@ function candEdit(k, n) {
     ${c ? '<button class="link danger wide" id="canddel">Remove this candidate</button>' : ''}</div>`;
 }
 
+// ---------- HQ: a big-screen overview for whoever runs the campaign ----------
+let hqKind = 'hd', hqDist = '';
+function packStats(p) {
+  const st = { doors: 0, done: 0, talked: 0, voted: 0 };
+  for (const t of packs[p].turfs) for (const r of doorsOf(t)) {
+    st.doors++;
+    const v = resOf(p, t.id, r.n)?.res;
+    if (v?.length) { st.done++; if (v.includes('Talked')) st.talked++; if (v.includes('Voted')) st.voted++; }
+  }
+  return st;
+}
+const addStats = (a, b) => ({ doors: a.doors + b.doors, done: a.done + b.done, talked: a.talked + b.talked, voted: a.voted + b.voted });
+const pct = (a, b) => (b ? Math.round((100 * a) / b) : 0);
+const statCells = (st) => `<td class="num-c">${st.doors}</td><td class="num-c">${st.done}</td>
+  <td><div class="hqbar"><div style="width:${pct(st.done, st.doors)}%"></div></div><small>${pct(st.done, st.doors)}%</small></td>
+  <td class="num-c">${st.talked}</td><td class="num-c">${st.voted}</td>`;
+const statHead = '<th class="num-c">Doors</th><th class="num-c">Done</th><th>Progress</th><th class="num-c">Talked</th><th class="num-c">Voted</th>';
+
+function hqView() {
+  const titles = Object.keys(packs).sort(natural);
+  const stats = Object.fromEntries(titles.map((p) => [p, packStats(p)]));
+  const total = titles.reduce((a, p) => addStats(a, stats[p]), { doors: 0, done: 0, talked: 0, voted: 0 });
+  const hasDist = titles.some((p) => packs[p].cd);
+  const groups = {};
+  for (const p of titles) { const n = packs[p][hqKind]; if (n) (groups[n] ||= []).push(p); }
+  const nums = Object.keys(groups).map(Number).sort((a, b) => a - b);
+  if (hqDist && !groups[hqDist]) hqDist = '';
+  const distRows = nums.map((n) => {
+    const st = groups[n].reduce((a, p) => addStats(a, stats[p]), { doors: 0, done: 0, talked: 0, voted: 0 });
+    const c = cands[candKey(hqKind, n)];
+    return `<tr class="${+hqDist === n ? 'sel' : ''}"><td><button class="link" data-hqdist="${n}">${hqKind.toUpperCase()} ${n}</button></td>
+      <td><a class="hqcand" href="#/c/${hqKind}/${n}">${face(c, 'xs')}<span>${c ? esc(c.name) : '<span class="muted">Add candidate</span>'}</span></a></td>
+      <td class="num-c">${groups[n].length}</td>${statCells(st)}
+      <td class="act"><button class="btn tonal sm" data-senddist="${n}">Send file</button></td></tr>`;
+  }).join('');
+  const shown = hqDist ? groups[hqDist] : titles;
+  const packRows = shown.map((p) => `<tr><td><a href="#/k/${enc(p)}">${esc(p)}</a></td><td class="muted">${districts(packs[p])}</td>
+    <td class="num-c">${packs[p].turfs.length}</td>${statCells(stats[p])}
+    <td class="act"><button class="btn tonal sm" data-sendpack="${esc(p)}">Send file</button></td></tr>`).join('');
+  const note = flash ? `<p class="flash" role="status">${esc(flash)}</p>` : '';
+  flash = '';
+  return `${note}<header class="top"><nav class="bar-nav"><a href="#/" class="back">${ICON.back}Turfs</a></nav>
+    <h1 class="h-sm">HQ</h1><div class="sub">Progress across every precinct on this computer. Send precincts out as files, and load the results spreadsheets volunteers send back.</div></header>
+    <label class="drop" id="drop"><input id="hqfiles" type="file" multiple hidden>
+      <b>Drop files here, or click to choose</b><span>Walk list files, candidate files, and volunteers’ results spreadsheets (.csv). Newer results win.</span></label>
+    <div class="tiles"><div><b>${titles.length}</b><span>Precincts</span></div><div><b>${total.doors}</b><span>Doors</span></div>
+      <div><b>${total.done}</b><span>Doors done · ${pct(total.done, total.doors)}%</span></div><div><b>${total.talked}</b><span>Talked</span></div><div><b>${total.voted}</b><span>Voted</span></div></div>
+    ${hasDist ? `<section class="card hqcard"><div class="hqhead"><div class="card-title">By district</div>
+      <div class="seg">${['cd', 'sd', 'hd'].map((k) => `<button class="${k === hqKind ? 'on' : ''}" data-hqkind="${k}">${{ cd: 'Congress', sd: 'Senate', hd: 'House' }[k]}</button>`).join('')}</div></div>
+      <div class="tablewrap"><table class="hqt"><thead><tr><th>District</th><th>Our candidate</th><th class="num-c">Precincts</th>${statHead}<th></th></tr></thead><tbody>${distRows}</tbody></table></div></section>` : ''}
+    <section class="card hqcard"><div class="hqhead"><div class="card-title">${hqDist ? `Precincts in ${hqKind.toUpperCase()} ${hqDist}` : 'All precincts'}</div>
+      ${hqDist ? '<button class="link" data-hqdist="">Show all</button>' : ''}</div>
+      ${titles.length ? `<div class="tablewrap"><table class="hqt"><thead><tr><th>Precinct</th><th>Districts</th><th class="num-c">Turfs</th>${statHead}<th></th></tr></thead><tbody>${packRows}</tbody></table></div>`
+        : '<p class="muted">No walk lists yet. Drop list files above.</p>'}</section>
+    <div class="row2"><button class="btn" id="export" ${Object.keys(results).length ? '' : 'disabled'}>Download all results</button><a class="btn tonal" href="#/c">Edit candidates</a></div>`;
+}
+
 const notFound = () => `<header class="top"><a href="#/" class="back">${ICON.back}Turfs</a><h1 class="h-sm">Not found</h1><p class="sub">That turf isn’t loaded on this phone.</p></header>`;
 
 // ---------- routing ----------
@@ -285,8 +351,9 @@ function render() {
   const [v, a, b, c] = parts;
   document.body.classList.toggle('printing', v === 'p');
   $('#app').innerHTML = v === 'k' ? packView(a) : v === 't' ? turfView(a, b) : v === 'd' ? doorView(a, b, c) : v === 'p' ? printView(a, b)
-    : v === 'scan' ? scanView() : v === 'load' ? loadView() : v === 'c' ? (a ? candEdit(a, b) : candsView()) : home();
+    : v === 'scan' ? scanView() : v === 'load' ? loadView() : v === 'hq' ? hqView() : v === 'c' ? (a ? candEdit(a, b) : candsView()) : home();
   if (v !== 'scan' && v !== 'p') window.scrollTo(0, 0);
+  document.body.classList.toggle('hq', v === 'hq');
   if (v === 't') document.querySelector('.door.cur')?.scrollIntoView({ block: 'center' });
 }
 
@@ -335,6 +402,13 @@ document.addEventListener('click', async (e) => {
   } else if (el.id === 'candnophoto') {
     draft.photo = ''; $('#candface').innerHTML = face({ name: $('#candname').value }, 'lg'); el.hidden = true;
   } else if (el.id === 'sharecands') shareCands();
+  else if (el.dataset.hqkind) { hqKind = el.dataset.hqkind; hqDist = ''; render(); }
+  else if (el.dataset.hqdist !== undefined) { hqDist = el.dataset.hqdist; render(); }
+  else if (el.dataset.sendpack) packFile([el.dataset.sendpack], `${el.dataset.sendpack}.json`, `Walk list: ${el.dataset.sendpack}`);
+  else if (el.dataset.senddist) {
+    const k = hqKind, n = +el.dataset.senddist, ts = Object.keys(packs).filter((p) => packs[p][k] === n).sort(natural);
+    packFile(ts, `${k.toUpperCase()} ${n}.json`, `Walk lists for ${DIST_NAME[k]} ${n} (${ts.length} precincts)`);
+  }
   else if (el.id === 'export') exportCsv();
   else if (el.dataset.share) shareTurf(location.hash.replace(/^#\//, '').split('/').map(decodeURIComponent)[1], el.dataset.share);
   else if (el.dataset.del) {
@@ -356,6 +430,7 @@ document.addEventListener('input', (e) => {
 
 document.addEventListener('change', async (e) => {
   const inp = e.target;
+  if (inp.id === 'dist' && inp.value === 'edit') { location.hash = '#/c'; return; }
   if (inp.id === 'dist') { filter = inp.value ? inp.value.toUpperCase() : ''; render(); return; }
   if (inp.id === 'candcam' || inp.id === 'candfile') {
     const f = inp.files[0]; inp.value = '';
@@ -365,37 +440,10 @@ document.addEventListener('change', async (e) => {
     $('#candnophoto').hidden = false;
     return;
   }
-  if (inp.id === 'packs') {
-    const added = [];
-    let candsIn = 0;
-    for (const f of inp.files) {
-      try {
-        let d;
-        try { d = JSON.parse(await readText(f)); } catch { d = null; }
-        const list = d?.packs || [d];
-        const good = list.filter((x) => x && x.v === 1 && x.title && Array.isArray(x.turfs));
-        const nc = d?.candidates ? await mergeCands(d.candidates) : 0;
-        candsIn += nc;
-        if (!good.length) { if (!d?.candidates) alert(`${f.name} is not a walk list file.`); continue; }
-        for (const x of good) { packs[x.title] = mergePack(packs[x.title], x); added.push(x.title); }
-        await db.putMany('packs', good.map((x) => [x.title, packs[x.title]]));
-      } catch (err) { alert(`Loaded ${f.name}, but this phone would not save it, so it will be gone after you close the app. (${err.message})`); }
-    }
+  if (inp.id === 'packs' || inp.id === 'resfiles' || inp.id === 'hqfiles') {
+    const files = [...inp.files];
     inp.value = '';
-    if (candsIn) added.push(`${candsIn} candidate${candsIn === 1 ? '' : 's'}`);
-    if (added.length) {
-      flash = added.length > 3 ? `Loaded ${added.length - (candsIn ? 1 : 0)} precincts${candsIn ? ` and ${added.at(-1)}` : ''}` : `Loaded ${added.join(', ')}`;
-      filter = '';
-      location.hash = '#/';   // the hashchange handler shows My turfs with the message
-    } else render();
-  } else if (inp.id === 'resfiles') {
-    let n = 0;
-    for (const f of inp.files) {
-      try { n += await importCsv(await f.text()); } catch (err) { alert(`Could not read ${f.name}: ${err.message}`); }
-    }
-    inp.value = '';
-    flash = `Imported ${n} door result${n === 1 ? '' : 's'}`;
-    location.hash = '#/';
+    await loadFiles(files);
   } else if (inp.id === 'cam' || inp.id === 'files') {
     for (const f of inp.files) {
       const s = { name: f.name, busy: true };
@@ -408,6 +456,38 @@ document.addEventListener('change', async (e) => {
     inp.value = '';
   }
 });
+
+// Loads walk list files, candidate files and results spreadsheets, whichever they are.
+async function loadFiles(files) {
+  const added = [];
+  let candsIn = 0, resIn = 0;
+  for (const f of files) {
+    let text;
+    try { text = await readText(f); } catch (err) { alert(`Could not open ${f.name}: ${err.message}`); continue; }
+    if (!/^\s*[{[]/.test(text)) {   // a results spreadsheet
+      try { resIn += await importCsv(text); } catch (err) { alert(`Could not read ${f.name}: ${err.message}`); }
+      continue;
+    }
+    try {
+      let d;
+      try { d = JSON.parse(text); } catch { d = null; }
+      const list = d?.packs || [d];
+      const good = list.filter((x) => x && x.v === 1 && x.title && Array.isArray(x.turfs));
+      candsIn += d?.candidates ? await mergeCands(d.candidates) : 0;
+      if (!good.length) { if (!d?.candidates) alert(`${f.name} is not a walk list file.`); continue; }
+      for (const x of good) { packs[x.title] = mergePack(packs[x.title], x); added.push(x.title); }
+      await db.putMany('packs', good.map((x) => [x.title, packs[x.title]]));
+    } catch (err) { alert(`Loaded ${f.name}, but this device would not save it, so it will be gone after you close the app. (${err.message})`); }
+  }
+  const parts = [];
+  if (added.length) parts.push(added.length > 3 ? `${added.length} precincts` : added.join(', '));
+  if (candsIn) parts.push(`${candsIn} candidate${candsIn === 1 ? '' : 's'}`);
+  if (resIn || (!parts.length && files.length)) parts.push(`${resIn} door result${resIn === 1 ? '' : 's'}`);
+  if (!parts.length) return render();
+  flash = `Loaded ${parts.join(' and ')}`;
+  if (location.hash.startsWith('#/hq')) render();
+  else { filter = ''; if (location.hash === '#/' || location.hash === '') render(); else location.hash = '#/'; }
+}
 
 // A shared one-turf file must not wipe the other turfs of a precinct already on this phone.
 function mergePack(old, inc) {
@@ -427,6 +507,17 @@ async function shareTurf(p, tid) {
   const name = `${p} Turf ${tid.slice(1)}.json`;
   await shareFile(new File([JSON.stringify(out)], name, { type: 'application/json' }),
     `Walk list: ${p} Turf ${tid.slice(1)}. Open ${location.origin}${location.pathname} and load this file under Lists & export.`);
+}
+
+// Whole precincts for a volunteer or team lead, with their candidates.
+function packFile(titles, name, text) {
+  const ps = titles.map((t) => packs[t]);
+  const cs = {};
+  for (const pk of ps) for (const x of candsOf(pk)) if (x.c) cs[candKey(x.k, x.n)] = x.c;
+  const out = ps.length === 1 ? { ...ps[0] } : { v: 1, packs: ps };
+  if (Object.keys(cs).length) out.candidates = cs;
+  return shareFile(new File([JSON.stringify(out)], name, { type: 'application/json' }),
+    `${text}. Open ${location.origin}${location.pathname} and load this file under Lists & export.`);
 }
 
 // All candidates in one file. Volunteers load it under Lists & export, like a list file.
@@ -500,6 +591,16 @@ function exportCsv() {
   a.download = `walk-list-results-${new Date().toISOString().slice(0, 10)}.csv`;
   a.click();
 }
+
+// Drag files onto the HQ screen (or anywhere) to load them.
+addEventListener('dragover', (e) => { if ([...(e.dataTransfer?.types || [])].includes('Files')) { e.preventDefault(); $('#drop')?.classList.add('over'); } });
+addEventListener('dragleave', (e) => { if (!e.relatedTarget) $('#drop')?.classList.remove('over'); });
+addEventListener('drop', (e) => {
+  if (!e.dataTransfer?.files?.length) return;
+  e.preventDefault();
+  $('#drop')?.classList.remove('over');
+  loadFiles([...e.dataTransfer.files]);
+});
 
 // ---------- start ----------
 
