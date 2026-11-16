@@ -32,9 +32,18 @@ function districtMenu(titles) {
   if (!sets.cd.size) return '';
   const cur = (DIST_RE.exec(filter) || []).slice(1, 3).join(' ').toLowerCase();
   const group = (k, label) => `<optgroup label="${label}">${[...sets[k]].sort((a, b) => a - b).map((n) => {
-    const v = `${k} ${n}`; return `<option value="${v}" ${v === cur ? 'selected' : ''}>${k.toUpperCase()} ${n}</option>`; }).join('')}</optgroup>`;
+    const v = `${k} ${n}`, c = cands[v];
+    return `<option value="${v}" ${v === cur ? 'selected' : ''}>${k.toUpperCase()} ${n}${c ? ` · ${esc(c.name)}` : ''}</option>`; }).join('')}</optgroup>`;
+  // The picked district's candidate sits right under the menu, with a button to add or change the name and photo.
+  let who = '';
+  if (cur) {
+    const [k, n] = cur.split(' '), c = cands[cur];
+    who = `<a class="cand solo ${c ? '' : 'empty'}" href="#/c/${k}/${n}">${face(c)}<span class="cwho"><small>${k.toUpperCase()} ${n} · our candidate</small>
+      <b>${c ? esc(c.name) : 'No candidate yet'}</b>${c?.incumbent ? '<small>Incumbent</small>' : ''}</span><span class="pill">${c ? 'Edit' : 'Add name &amp; photo'}</span></a>`;
+  }
   return `<label class="distpick"><span class="sr">Filter by district</span><select id="dist"><option value="">All districts</option>
-    ${group('cd', 'Congress')}${group('sd', 'Oregon Senate')}${group('hd', 'Oregon House')}</select></label>`;
+    ${group('cd', 'Congress')}${group('sd', 'Oregon Senate')}${group('hd', 'Oregon House')}
+    <optgroup label="Candidates"><option value="edit">Add or change candidate names and photos…</option></optgroup></select></label>${who}`;
 }
 const districts = (pk) => (pk?.cd ? `CD ${pk.cd} · HD ${pk.hd} · SD ${pk.sd}` : '');
 
@@ -119,9 +128,7 @@ function home() {
     const [, k, num] = DIST_RE.exec(f);
     const hits = titles.filter((p) => packs[p][k] === +num);
     const n = hits.reduce((s, p) => s + packDoors(p), 0), d = hits.reduce((s, p) => s + packDone(p), 0);
-    const c = cands[candKey(k, +num)];
-    const who = `<a class="cand solo ${c ? '' : 'empty'}" href="#/c/${k}/${+num}">${face(c)}<span class="cwho"><small>${k.toUpperCase()} ${+num} · our candidate</small><b>${c ? esc(c.name) : 'Add candidate'}</b>${c?.incumbent ? '<small>Incumbent</small>' : ''}</span></a>`;
-    body = hits.length ? `${who}<h3 class="street">${DIST_NAME[k]} ${num} · ${hits.length} precinct${hits.length === 1 ? '' : 's'} · ${d ? `${d} of ${n}` : n} doors</h3><div class="group">${hits.map(packRow).join('')}</div>`
+    body = hits.length ? `<h3 class="street">${DIST_NAME[k]} ${num} · ${hits.length} precinct${hits.length === 1 ? '' : 's'} · ${d ? `${d} of ${n}` : n} doors</h3><div class="group">${hits.map(packRow).join('')}</div>`
       : `<p class="empty">No loaded precincts are in ${k.toUpperCase()} ${num}.${titles.some((p) => packs[p].cd) ? '' : ' Load the newest list file to get districts.'}</p>`;
   } else if (f) {
     const hitPacks = titles.filter((p) => p.toLowerCase().includes(f));
@@ -356,6 +363,7 @@ document.addEventListener('input', (e) => {
 
 document.addEventListener('change', async (e) => {
   const inp = e.target;
+  if (inp.id === 'dist' && inp.value === 'edit') { location.hash = '#/c'; return; }
   if (inp.id === 'dist') { filter = inp.value ? inp.value.toUpperCase() : ''; render(); return; }
   if (inp.id === 'candcam' || inp.id === 'candfile') {
     const f = inp.files[0]; inp.value = '';
