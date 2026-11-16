@@ -138,3 +138,32 @@ body.printing #app { max-width: none; padding: 0; }
 .mini { width: 56px; height: 5px; background: var(--rule); border-radius: 3px; overflow: hidden; } .mini div { height: 100%; background: var(--accent); }
 .chev { color: var(--ink-2); font-size: 22px; }
 .navr { display: flex; gap: 18px; align-items: center; }
+
+/* candidates */
+.face { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; flex-shrink: 0; background: var(--tonal); }
+.face.none { display: inline-flex; align-items: center; justify-content: center; color: var(--tonal-ink); font-weight: 700; font-size: 15px; }
+.face.sm { width: 40px; height: 40px; }
+.face.lg { width: 120px; height: 120px; font-size: 36px; }
+.cands { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+.cand { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 6px; background: var(--surface); border-radius: 12px; text-decoration: none; color: var(--ink); text-align: center; min-width: 0; }
+.cand.empty { color: var(--ink-2); }
+.cand.empty .face { background: var(--rule); color: var(--ink-2); }
+.cwho { display: flex; flex-direction: column; min-width: 0; max-width: 100%; }
+.cwho b { font-size: 14px; line-height: 1.2; overflow-wrap: anywhere; }
+.cwho small { font-size: 12px; color: var(--ink-2); font-weight: 600; }
+.cand.solo { flex-direction: row; text-align: left; padding: 12px 14px; margin: 8px 0; gap: 12px; }
+.cand.solo .face { width: 56px; height: 56px; }
+.cand.solo .cwho b { font-size: 17px; }
+.prow .face { margin-right: 0; }
+.candedit { display: flex; align-items: center; gap: 16px; margin: 8px 0; }
+.photobtns { display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 0; }
+.photobtns .link { min-height: 32px; font-size: 15px; }
+.field { width: 100%; height: 48px; border-radius: 12px; border: 1px solid var(--rule); background: var(--surface); color: var(--ink); padding: 0 12px; font: inherit; }
+.check { display: flex; align-items: center; gap: 10px; min-height: 44px; margin-top: 8px; font-size: 16px; }
+.check input { width: 22px; height: 22px; accent-color: var(--accent); }
+.link.wide { width: 100%; justify-content: center; margin-top: 8px; }
+.sh-cands { position: absolute; right: .8in; top: 1.74in; display: flex; gap: .12in; }
+.sh-cand { display: flex; align-items: center; gap: .05in; max-width: 1.1in; }
+.sh-cand img { width: .42in; height: .42in; border-radius: 50%; object-fit: cover; border: 1px solid #999; flex-shrink: 0; }
+.sh-cand span { font-size: 8px; line-height: 1.15; color: #444; display: flex; flex-direction: column; overflow: hidden; }
+.sh-cand b { font-size: 9px; color: #111; }

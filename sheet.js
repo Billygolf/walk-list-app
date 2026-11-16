@@ -10,7 +10,17 @@ function qrSvg(text) {
   return q.createSvgTag({ cellSize: 4, margin: 0, scalable: true });
 }
 
-export function sheetHtml(pack, turf) {
+// Our candidates for this precinct, printed in the gap under the page code. Kept out of the page-code
+// area the scanner reads (above 1.7in), and round so a dark photo is never mistaken for a corner square.
+function candsHtml(list) {
+  const set = (list || []).filter((x) => x.c);
+  if (!set.length) return '';
+  return `<div class="sh-cands">${set.map(({ k, n, c }) => `<div class="sh-cand">${c.photo ? `<img src="${c.photo}" alt="">` : ''}
+    <span><b>${esc(c.name)}</b>${k.toUpperCase()} ${n}</span></div>`).join('')}</div>`;
+}
+
+export function sheetHtml(pack, turf, cands) {
+  const who = candsHtml(cands);
   const pages = paginate(turf);
   const firstOfMap = new Set();
   const seen = new Set();
@@ -42,7 +52,7 @@ export function sheetHtml(pack, turf) {
       <div class="sh-hd"><div class="sh-eb">${esc(pack.title)}${pack.cd ? ` · CD ${pack.cd} · HD ${pack.hd} · SD ${pack.sd}` : ''} · Turf ${turf.id.slice(1)} of ${pack.turfCount || pack.turfs.length} · Page ${p} of ${pages.length}</div>
       <div class="sh-h2">${esc(nice(turf.name))}</div><div class="sh-sign">Canvasser ____________________ &nbsp; Date __________</div></div>
       <div class="sh-pq">${qrSvg(code)}</div><div class="sh-pid">${esc(code.slice(4))}</div>
-      <div class="sh-maps">${qrs}</div>
+      <div class="sh-maps">${qrs}</div>${maps.length <= 4 ? who : ''}
       <div class="sh-th" style="top:${G.TOP - 0.42}in"><span class="sh-seq">#</span><span class="sh-ad">Address</span><span class="sh-nm">Voter</span><span class="sh-ti">Tier</span>${heads}<span class="sh-note">Notes</span></div>
       ${rows}
       <div class="sh-foot">Mark a box with a check or X. A door can have more than one. Keep the black corner squares clear.</div></div>`;
