@@ -62,13 +62,18 @@ function candStrip(pk, always) {
     <span class="cwho"><small>${k.toUpperCase()} ${n}</small><b>${c ? esc(c.name) : 'Add candidate'}</b>${c?.incumbent ? '<small>Incumbent</small>' : ''}</span></a>`).join('')}</div>`;
 }
 // Saves candidates that came in a file. Newer edits win, so loading an old file never undoes a change.
+// A photo always fills a missing one, though: phone and computer clocks can disagree by minutes,
+// and a name typed on the phone must not block the photo added at HQ.
 async function mergeCands(inc) {
   const put = [];
   for (const [k, v] of Object.entries(inc || {})) {
     if (!/^(cd|hd|sd) \d+$/.test(k) || !v?.name) continue;
+    const photo = /^data:image\/(jpeg|png|webp);base64,/.test(v.photo || '') ? v.photo : '';
     const old = cands[k];
-    if (old && (old.at || '') >= (v.at || '')) continue;
-    const c = { name: String(v.name).slice(0, 80), incumbent: !!v.incumbent, photo: /^data:image\/(jpeg|png|webp);base64,/.test(v.photo || '') ? v.photo : '', at: v.at || new Date().toISOString() };
+    let c;
+    if (!old || (old.at || '') < (v.at || '')) c = { name: String(v.name).slice(0, 80), incumbent: !!v.incumbent, photo, at: v.at || new Date().toISOString() };
+    else if (photo && !old.photo) c = { ...old, photo };
+    else continue;
     cands[k] = c; put.push([k, c]);
   }
   if (put.length) await db.putMany('cands', put);
@@ -608,5 +613,10 @@ addEventListener('drop', (e) => {
   [packs, results, cands] = await Promise.all([db.getAll('packs'), db.getAll('results'), db.getAll('cands')]);
   addEventListener('hashchange', render);
   render();
-  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js');
+  if ('serviceWorker' in navigator && location.protocol === 'https:') {
+    navigator.serviceWorker.register('sw.js').then((r) => r.update()).catch(() => {});
+    // A new version took over: reload once so this phone runs it now, not on the next visit.
+    const had = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener('controllerchange', () => { if (had && !draft && !scans.length && !location.hash.startsWith('#/scan')) location.reload(); });
+  }
 })();
